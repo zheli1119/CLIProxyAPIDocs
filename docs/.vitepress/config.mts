@@ -4,6 +4,9 @@ import {defineConfig} from 'vitepress'
 export default defineConfig({
     title: "CLIProxyAPI",
     description: "Wrap Gemini CLI, ChatGPT Codex, Claude Code, Qwen Code, iFlow as an OpenAI/Gemini/Claude/Codex compatible API service, allowing you to enjoy the free Gemini 2.5 Pro, GPT 5, Claude, Qwen model through API",
+    rewrites: {
+        'en/:rest*': ':rest*'
+    },
     themeConfig: {
         // https://vitepress.dev/reference/default-theme-config
         nav: [
