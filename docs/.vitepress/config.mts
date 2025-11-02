@@ -18,39 +18,39 @@ export default defineConfig({
             {
                 text: 'Introduction',
                 items: [
-                    {text: 'What is CLIProxyAPI?', link: '/en/introduction/what-is-cliproxyapi'},
-                    {text: 'Quick Start', link: '/en/introduction/quick-start'},
+                    {text: 'What is CLIProxyAPI?', link: '/introduction/what-is-cliproxyapi'},
+                    {text: 'Quick Start', link: '/introduction/quick-start'},
                     {text: 'GitHub', link: 'https://github.com/router-for-me/CLIProxyAPI'}
                 ]
             },
             {
                 text: 'Configuration',
                 items: [
-                    {text: 'Basic Configuration', link: '/en/configuration/basic'},
-                    {text: 'Configuration Options', link: '/en/configuration/options'},
-                    {text: 'Authentication Directory', link: '/en/configuration/auth-dir'},
-                    {text: 'Hot Reloading', link: '/en/configuration/hot-reloading'},
+                    {text: 'Basic Configuration', link: '/configuration/basic'},
+                    {text: 'Configuration Options', link: '/configuration/options'},
+                    {text: 'Authentication Directory', link: '/configuration/auth-dir'},
+                    {text: 'Hot Reloading', link: '/configuration/hot-reloading'},
                     {
                         text: 'Storage',
                         items:[
-                            {text: 'Git Storage', link: '/en/configuration/storage/git'},
-                            {text: 'PostgreSQL Storage', link: '/en/configuration/storage/pgsql'},
-                            {text: 'Object Storage', link: '/en/configuration/storage/s3'},
+                            {text: 'Git Storage', link: '/configuration/storage/git'},
+                            {text: 'PostgreSQL Storage', link: '/configuration/storage/pgsql'},
+                            {text: 'Object Storage', link: '/configuration/storage/s3'},
                         ]
                     },
                     {
                         text: 'Providers',
                         items:[
-                            {text: 'Gemini CLI', link: '/en/configuration/provider/gemini-cli'},
-                            {text: 'Claude Code', link: '/en/configuration/provider/claude-code'},
-                            {text: 'Codex', link: '/en/configuration/provider/codex'},
-                            {text: 'Qwen Code', link: '/en/configuration/provider/qwen-code'},
-                            {text: 'iFlow', link: '/en/configuration/provider/iflow'},
-                            {text: 'AI Studio', link: '/en/configuration/provider/ai-studio'},
-                            {text: 'OpenAI Compatibility', link: '/en/configuration/provider/openai-compatibility'},
-                            {text: 'Claude Code Compatibility', link: '/en/configuration/provider/claude-code-compatibility'},
-                            {text: 'Gemini Compatibility', link: '/en/configuration/provider/gemini-compatibility'},
-                            {text: 'Codex Compatibility', link: '/en/configuration/provider/codex-compatibility'},
+                            {text: 'Gemini CLI', link: '/configuration/provider/gemini-cli'},
+                            {text: 'Claude Code', link: '/configuration/provider/claude-code'},
+                            {text: 'Codex', link: '/configuration/provider/codex'},
+                            {text: 'Qwen Code', link: '/configuration/provider/qwen-code'},
+                            {text: 'iFlow', link: '/configuration/provider/iflow'},
+                            {text: 'AI Studio', link: '/configuration/provider/ai-studio'},
+                            {text: 'OpenAI Compatibility', link: '/configuration/provider/openai-compatibility'},
+                            {text: 'Claude Code Compatibility', link: '/configuration/provider/claude-code-compatibility'},
+                            {text: 'Gemini Compatibility', link: '/configuration/provider/gemini-compatibility'},
+                            {text: 'Codex Compatibility', link: '/configuration/provider/codex-compatibility'},
                         ]
                     },
                 ]
@@ -58,24 +58,24 @@ export default defineConfig({
             {
                 text: 'Management',
                 items: [
-                    {text: 'Web UI', link: '/en/management/webui'},
-                    {text: 'Desktop GUI', link: '/en/management/gui'},
+                    {text: 'Web UI', link: '/management/webui'},
+                    {text: 'Desktop GUI', link: '/management/gui'},
                 ]
             },
             {
                 text: 'Agent Client Configuration',
                 items: [
-                    {text: 'Claude Code', link: '/en/agent-client/claude-code'},
-                    {text: 'Codex', link: '/en/agent-client/codex'},
-                    {text: 'Gemini CLI', link: '/en/agent-client/gemini-cli'},
-                    {text: 'Factory Droid', link: '/en/agent-client/droid'}
+                    {text: 'Claude Code', link: '/agent-client/claude-code'},
+                    {text: 'Codex', link: '/agent-client/codex'},
+                    {text: 'Gemini CLI', link: '/agent-client/gemini-cli'},
+                    {text: 'Factory Droid', link: '/agent-client/droid'}
                 ]
             },
             {
                 text: 'Docker',
                 items: [
-                    {text: 'Run with Docker', link: '/en/docker/docker'},
-                    {text: 'Run with Docker Compose', link: '/en/docker/docker-compose'},
+                    {text: 'Run with Docker', link: '/docker/docker'},
+                    {text: 'Run with Docker Compose', link: '/docker/docker-compose'},
                 ]
             },
 
@@ -95,7 +95,7 @@ export default defineConfig({
         root: {
             label: 'English',
             lang: 'en-US',
-            link: '/en'
+            link: '/'
         },
         cn: {
             label: '简体中文',
