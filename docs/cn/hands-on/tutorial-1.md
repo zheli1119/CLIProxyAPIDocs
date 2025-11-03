@@ -31,7 +31,7 @@ CLIProxyAPI 是一款使用 Go 语言编写的开源 AI 代理工具。也许是
 | 可复用的 Go SDK | deepseek-r1 |
 | | deepseek-v3 |
 | | kimi-k2 |
-| | glm-4.5 |
+| | glm-4.6 |
 | | tstars2.0 |
 | | 以及其他 iFlow 支持的模型 |
 

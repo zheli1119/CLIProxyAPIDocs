@@ -79,7 +79,22 @@ export default defineConfig({
                     {text: 'Run with Docker Compose', link: '/docker/docker-compose'},
                 ]
             },
-
+            {
+                text: 'Hands-on Tutorials',
+                items: [
+                    {text: 'Zero: Detailed Configuration Explanation', link: '/hands-on/tutorial-0'},
+                    {text: 'One: Project Introduction + Qwen Hands-on', link: '/hands-on/tutorial-1'},
+                    {text: 'Two: Gemini CLI + Codex Hands-on', link: '/hands-on/tutorial-2'},
+                    {text: 'Three: NanoBanana Hands-on', link: '/hands-on/tutorial-3'},
+                    {text: 'Four: Relay Forwarding Integration', link: '/hands-on/tutorial-4'},
+                    {text: 'Five: Docker Server Deployment', link: '/hands-on/tutorial-5'},
+                    {text: 'Six: The Beginner\'s Favorite GUI', link: '/hands-on/tutorial-6'},
+                    {text: 'Zero-Cost Deployment (ClawCloud)', link: '/hands-on/tutorial-7'},
+                    {text: 'Zero-Cost Deployment (HuggingFace)', link: '/hands-on/tutorial-8'},
+                    {text: 'Zero-Cost Deployment (Railway)', link: '/hands-on/tutorial-9'},
+                    {text: 'Zero-Cost Deployment (Render)', link: '/hands-on/tutorial-10'},
+                ]
+            },
         ],
 
         socialLinks: [
