@@ -23,7 +23,9 @@ outline: 'deep'
 若在启动时检测到配置中的管理密钥为明文，会自动使用 bcrypt 加密并回写到配置文件中。
 
 其它说明：
-- 若 `remote-management.secret-key` 为空，则管理 API 整体被禁用（所有 `/v0/management` 路由均返回 404）。
+- 设置环境变量 `MANAGEMENT_PASSWORD` 会将其视为额外的明文管理密钥，并强制启用远程管理（即便 `allow-remote-management` 为 false）。该值不会写入配置，需要通过 `Authorization` / `X-Management-Key` 头部直接发送。
+- 通过 `cliproxy run --password <pwd>` 或 SDK 的 `WithLocalManagementPassword` 启动服务后，来自 `127.0.0.1`/`::1` 的请求可使用该“本地密码”替代远程密钥，同样通过上述头部传递；该密码仅存在于运行时内存。
+- 仅当 `remote-management.secret-key` 为空且未设置 `MANAGEMENT_PASSWORD` 时，管理 API 才会整体被禁用（所有 `/v0/management` 路由均返回 404）。
 - 对于远程 IP，连续 5 次认证失败会触发临时封禁（约 30 分钟）。
 
 ## 请求/响应约定
@@ -186,6 +188,8 @@ outline: 'deep'
     - 说明：
         - 需要先启用文件日志，否则会以 `400` 返回 `{ "error": "logging to file disabled" }`。
         - 若当前没有日志文件，返回的 `lines` 为空数组、`line-count` 为 `0`。
+        - `latest-timestamp` 是本轮扫描到的最大时间戳；若日志无时间戳，则返回输入的 `after`（或 `0`），可直接作为下一次轮询的 `after`。
+        - `line-count` 为本轮遍历的行总数，包含被 `after` 过滤掉的旧日志，可帮助判断日志是否有新增。
 - DELETE `/logs` — 删除轮换日志并清空主日志
     - 响应：
       ```json
@@ -466,14 +470,14 @@ outline: 'deep'
       ```
     - 响应：
       ```json
-      { "codex-api-key": [ { "api-key": "sk-a", "base-url": "", "proxy-url": "" } ] }
+      { "codex-api-key": [ { "api-key": "sk-a", "base-url": "https://codex.example.com/v1", "proxy-url": "socks5://proxy.example.com:1080", "headers": { "X-Team": "cli" } } ] }
       ```
 - PUT `/codex-api-key` — 完整改写列表
     - 请求：
       ```bash
       curl -X PUT -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '[{"api-key":"sk-a","proxy-url":"socks5://proxy.example.com:1080"},{"api-key":"sk-b","base-url":"https://c.example.com","proxy-url":""}]' \
+        -d '[{"api-key":"sk-a","base-url":"https://codex.example.com/v1","proxy-url":"socks5://proxy.example.com:1080","headers":{"X-Team":"cli"}},{"api-key":"sk-b","base-url":"https://custom.example.com","proxy-url":"","headers":{"X-Env":"prod"}}]' \
         http://localhost:8317/v0/management/codex-api-key
       ```
     - 响应：
@@ -485,14 +489,14 @@ outline: 'deep'
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '{"index":1,"value":{"api-key":"sk-b2","base-url":"https://c.example.com","proxy-url":""}}' \
+        -d '{"index":1,"value":{"api-key":"sk-b2","base-url":"https://c.example.com","proxy-url":"","headers":{"X-Env":"stage"}}}' \
         http://localhost:8317/v0/management/codex-api-key
       ```
     - 请求（按匹配）：
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '{"match":"sk-a","value":{"api-key":"sk-a","base-url":"","proxy-url":"socks5://proxy.example.com:1080"}}' \
+        -d '{"match":"sk-a","value":{"api-key":"sk-a","base-url":"https://codex.example.com/v1","proxy-url":"socks5://proxy.example.com:1080","headers":{"X-Team":"cli"}}}' \
         http://localhost:8317/v0/management/codex-api-key
       ```
     - 响应：
@@ -512,6 +516,9 @@ outline: 'deep'
       ```json
       { "status": "ok" }
       ```
+    - 说明：
+        - `base-url` 必填；若 PUT/PATCH 中将 `base-url` 留空，则该条目会被视为删除。
+        - `headers` 支持自定义请求头，服务端会自动去除空白键值对。
 
 ### 请求重试次数
 - GET `/request-retry` — 获取整数
@@ -567,14 +574,14 @@ outline: 'deep'
       ```
     - 响应：
       ```json
-      { "claude-api-key": [ { "api-key": "sk-a", "base-url": "", "proxy-url": "" } ] }
+      { "claude-api-key": [ { "api-key": "sk-a", "base-url": "https://example.com/api", "proxy-url": "socks5://proxy.example.com:1080", "headers": { "X-Workspace": "team-a" } } ] }
       ```
 - PUT `/claude-api-key` — 完整改写列表
     - 请求：
       ```bash
       curl -X PUT -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '[{"api-key":"sk-a","proxy-url":"socks5://proxy.example.com:1080"},{"api-key":"sk-b","base-url":"https://c.example.com","proxy-url":""}]' \
+        -d '[{"api-key":"sk-a","proxy-url":"socks5://proxy.example.com:1080","headers":{"X-Workspace":"team-a"}},{"api-key":"sk-b","base-url":"https://c.example.com","proxy-url":"","headers":{"X-Env":"prod"}}]' \
         http://localhost:8317/v0/management/claude-api-key
       ```
     - 响应：
@@ -586,14 +593,14 @@ outline: 'deep'
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-          -d '{"index":1,"value":{"api-key":"sk-b2","base-url":"https://c.example.com","proxy-url":""}}' \
+          -d '{"index":1,"value":{"api-key":"sk-b2","base-url":"https://c.example.com","proxy-url":"","headers":{"X-Env":"stage"}}}' \
           http://localhost:8317/v0/management/claude-api-key
         ```
     - 请求（按匹配）：
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-          -d '{"match":"sk-a","value":{"api-key":"sk-a","base-url":"","proxy-url":"socks5://proxy.example.com:1080"}}' \
+          -d '{"match":"sk-a","value":{"api-key":"sk-a","base-url":"","proxy-url":"socks5://proxy.example.com:1080","headers":{"X-Workspace":"team-a"}}}' \
           http://localhost:8317/v0/management/claude-api-key
         ```
     - 响应：
@@ -613,6 +620,8 @@ outline: 'deep'
       ```json
       { "status": "ok" }
       ```
+    - 说明：
+        - `headers` 为可选的键值对，服务端会自动去除空白键/值；若需要移除某个头，在请求中省略该字段即可。
 
 ### OpenAI 兼容提供商（对象数组）
 - GET `/openai-compatibility` — 列出全部
@@ -622,14 +631,14 @@ outline: 'deep'
       ```
     - 响应：
       ```json
-      { "openai-compatibility": [ { "name": "openrouter", "base-url": "https://openrouter.ai/api/v1", "api-key-entries": [ { "api-key": "sk", "proxy-url": "" } ], "models": [] } ] }
+      { "openai-compatibility": [ { "name": "openrouter", "base-url": "https://openrouter.ai/api/v1", "api-key-entries": [ { "api-key": "sk", "proxy-url": "" } ], "models": [], "headers": { "X-Provider": "openrouter" } } ] }
       ```
 - PUT `/openai-compatibility` — 完整改写列表
     - 请求：
       ```bash
       curl -X PUT -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '[{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[{"name":"m","alias":"a"}]}]' \
+        -d '[{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[{"name":"m","alias":"a"}],"headers":{"X-Provider":"openrouter"}}]' \
         http://localhost:8317/v0/management/openai-compatibility
       ```
     - 响应：
@@ -641,14 +650,14 @@ outline: 'deep'
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '{"name":"openrouter","value":{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[]}}' \
+        -d '{"name":"openrouter","value":{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[],"headers":{"X-Provider":"openrouter"}}}' \
         http://localhost:8317/v0/management/openai-compatibility
       ```
     - 请求（按索引）：
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '{"index":0,"value":{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[]}}' \
+        -d '{"index":0,"value":{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[],"headers":{"X-Provider":"openrouter"}}}' \
         http://localhost:8317/v0/management/openai-compatibility
       ```
     - 响应：
@@ -658,6 +667,8 @@ outline: 'deep'
 
     - 说明：
         - 仍可提交遗留的 `api-keys` 字段，但所有密钥会自动迁移到 `api-key-entries` 中，返回结果中的 `api-keys` 会逐步留空。
+        - `headers` 可用于为某个兼容提供商统一追加 HTTP 头，服务端会自动去除空白键值。
+        - `base-url` 不能为空；若 PUT/PATCH 将 `base-url` 设为空字符串，则该提供商会被删除。
 - DELETE `/openai-compatibility` — 删除（`?name=` 或 `?index=`）
     - 请求（按名称）：
       ```bash
@@ -681,18 +692,48 @@ outline: 'deep'
       ```bash
       curl -H 'Authorization: Bearer <MANAGEMENT_KEY>' http://localhost:8317/v0/management/auth-files
       ```
-    - 响应：
+    - 响应（运行时认证管理器可用时）：
       ```json
-      { "files": [ { "name": "acc1.json", "size": 1234, "modtime": "2025-08-30T12:34:56Z", "type": "google", "email": "user@example.com" } ] }
+      {
+        "files": [
+          {
+            "id": "claude-user@example.com",
+            "name": "claude-user@example.com.json",
+            "provider": "claude",
+            "label": "Claude Prod",
+            "status": "ready",
+            "status_message": "ok",
+            "disabled": false,
+            "unavailable": false,
+            "runtime_only": false,
+            "source": "file",
+            "path": "/abs/path/auths/claude-user@example.com.json",
+            "size": 2345,
+            "modtime": "2025-08-30T12:34:56Z",
+            "email": "user@example.com",
+            "account_type": "anthropic",
+            "account": "workspace-1",
+            "created_at": "2025-08-30T12:00:00Z",
+            "updated_at": "2025-08-31T01:23:45Z",
+            "last_refresh": "2025-08-31T01:23:45Z"
+          }
+        ]
+      }
       ```
     - 说明：
-        - `modtime` 使用 RFC3339 格式；若文件中包含邮箱字段则一并返回。
+        - 列表对 `name` 做不区分大小写的排序；`status`、`status_message`、`disabled`、`unavailable` 直接反映运行时认证状态，便于识别失效凭据。
+        - `runtime_only=true` 表示该凭据仅存在于运行时存储（例如 Git/PG/ObjectStore 或远程导入），`source` 会是 `memory`；若存在对应磁盘文件则 `source=file` 并补充 `path`/`size`/`modtime`。
+        - `email`、`account_type`、`account`、`last_refresh` 来源于 JSON 内的元数据（自动兼容 `last_refresh`／`lastRefreshedAt` 等字段）。
+        - 当核心认证管理器不可用时会退回到扫描 `auth-dir`，此时仅返回 `name`、`size`、`modtime`、`type`、`email` 字段。
+        - `runtime_only` 数据无法通过下载/删除端点处理，需要在对应提供商后台或通过其他 API 撤销。
 
 - GET `/auth-files/download?name=<file.json>` — 下载单个文件
     - 请求：
       ```bash
       curl -H 'Authorization: Bearer <MANAGEMENT_KEY>' -OJ 'http://localhost:8317/v0/management/auth-files/download?name=acc1.json'
       ```
+    - 说明：
+        - `name` 必须是 `.json` 文件名，且仅能下载 `source=file` 的条目；`runtime_only` 凭据没有磁盘文件无法导出。
 
 - POST `/auth-files` — 上传
     - 请求（multipart）：
@@ -714,7 +755,7 @@ outline: 'deep'
       ```
     - 说明：
         - 需确保核心认证管理器已启用，否则会以 `503` 返回 `{ "error": "core auth manager unavailable" }`。
-        - 上传的文件名必须以 `.json` 结尾。
+        - multipart 与原始 JSON 两种上传方式都要求文件名以 `.json` 结尾，并会立即注册到运行时认证管理器中。
 
 - DELETE `/auth-files?name=<file.json>` — 删除单个文件
     - 请求：
@@ -725,6 +766,8 @@ outline: 'deep'
       ```json
       { "status": "ok" }
       ```
+    - 说明：
+        - 仅删除磁盘上的 `.json` 文件，并在成功删除后通知运行时管理器禁用对应凭据；`runtime_only` 条目不会被该端点移除。
 
 - DELETE `/auth-files?all=true` — 删除 `auth-dir` 下所有 `.json` 文件
     - 请求：
@@ -735,6 +778,8 @@ outline: 'deep'
       ```json
       { "status": "ok", "deleted": 3 }
       ```
+    - 说明：
+        - 仅统计并删除磁盘文件，成功后同样会对被移除的凭据执行禁用；对纯内存条目无影响。
 
 ### 登录/授权 URL
 
@@ -778,6 +823,9 @@ outline: 'deep'
       ```json
       { "status": "ok", "url": "https://...", "state": "gem-1716206400" }
       ```
+    - 说明：
+        - 若未提供 `project_id`，服务会通过 Cloud Resource Manager API 枚举可访问的项目并自动选择首个可用项目，写入的 token 会包含该项目 ID 以及 `auto: true` 标记。
+        - 登录过程中会检测 `cloudaicompanion.googleapis.com` 是否已启用，若未启用则调用 Service Usage API 尝试开启；若开启失败，`/get-auth-status` 会返回 `project activation required: ...` 之类的错误提示。
 
 - GET `/qwen-auth-url` — 开始 Qwen 登录（设备授权流程）
     - 请求：
@@ -819,6 +867,9 @@ outline: 'deep'
       ```json
       { "status": "error", "error": "Authentication failed" }
       ```
+    - 说明：
+        - `state` 参数必须与登录端点返回的值一致；若状态进入 `ok` 或 `error`，服务会清除该 state，再次轮询会收到 `{ "status": "ok" }` 表示流程已收尾。
+        - `status: "wait"` 表示仍在等待回调或令牌交换，可按需继续轮询。
 
 ## 错误响应
 

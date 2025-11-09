@@ -21,7 +21,9 @@ Note: The following options cannot be modified via API and must be set in the co
     - `X-Management-Key: <plaintext-key>`
 
 Additional notes:
-- If `remote-management.secret-key` is empty, the entire Management API is disabled (all `/v0/management` routes return 404).
+- Setting the `MANAGEMENT_PASSWORD` environment variable registers an additional plaintext management secret and forces remote management to stay enabled even when `allow-remote-management` is false. The value is never persisted and must be sent via the same `Authorization`/`X-Management-Key` headers.
+- When the proxy starts with `cliproxy run --password <pwd>` or via the SDK’s `WithLocalManagementPassword`, localhost clients (`127.0.0.1`/`::1`) may present that local-only password through the same headers; it only lives in memory and is not written to disk.
+- The Management API returns 404 only when both `remote-management.secret-key` is empty and `MANAGEMENT_PASSWORD` is unset.
 - For remote IPs, 5 consecutive authentication failures trigger a temporary ban (~30 minutes) before further attempts are allowed.
 
 If a plaintext key is detected in the config at startup, it will be bcrypt‑hashed and written back to the config file automatically.
@@ -186,6 +188,8 @@ If a plaintext key is detected in the config at startup, it will be bcrypt‑has
     - Notes:
         - Requires file logging to be enabled; otherwise returns `{ "error": "logging to file disabled" }` with `400`.
         - When no log file exists yet the response contains empty `lines` and `line-count: 0`.
+        - `latest-timestamp` is the largest parsed timestamp from this batch; if no timestamp is found it echoes the provided `after` (or `0`), so clients can pass it back unchanged for incremental polling.
+        - `line-count` reflects the total number of lines scanned (including those filtered out by `after`) and can be used to detect whether new log data arrived.
 - DELETE `/logs` — Remove rotated log files and truncate the active log
     - Response:
       ```json
@@ -466,14 +470,14 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
       ```
     - Response:
       ```json
-      { "codex-api-key": [ { "api-key": "sk-a", "base-url": "", "proxy-url": "" } ] }
+      { "codex-api-key": [ { "api-key": "sk-a", "base-url": "https://codex.example.com/v1", "proxy-url": "socks5://proxy.example.com:1080", "headers": { "X-Team": "cli" } } ] }
       ```
 - PUT `/codex-api-key` — Replace the list
     - Request:
       ```bash
       curl -X PUT -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '[{"api-key":"sk-a","proxy-url":"socks5://proxy.example.com:1080"},{"api-key":"sk-b","base-url":"https://c.example.com","proxy-url":""}]' \
+        -d '[{"api-key":"sk-a","base-url":"https://codex.example.com/v1","proxy-url":"socks5://proxy.example.com:1080","headers":{"X-Team":"cli"}},{"api-key":"sk-b","base-url":"https://custom.example.com","proxy-url":"","headers":{"X-Env":"prod"}}]' \
         http://localhost:8317/v0/management/codex-api-key
       ```
     - Response:
@@ -485,14 +489,14 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '{"index":1,"value":{"api-key":"sk-b2","base-url":"https://c.example.com","proxy-url":""}}' \
+        -d '{"index":1,"value":{"api-key":"sk-b2","base-url":"https://c.example.com","proxy-url":"","headers":{"X-Env":"stage"}}}' \
         http://localhost:8317/v0/management/codex-api-key
       ```
     - Request (by match):
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '{"match":"sk-a","value":{"api-key":"sk-a","base-url":"","proxy-url":"socks5://proxy.example.com:1080"}}' \
+        -d '{"match":"sk-a","value":{"api-key":"sk-a","base-url":"https://codex.example.com/v1","proxy-url":"socks5://proxy.example.com:1080","headers":{"X-Team":"cli"}}}' \
         http://localhost:8317/v0/management/codex-api-key
       ```
     - Response:
@@ -512,6 +516,9 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
       ```json
       { "status": "ok" }
       ```
+    - Notes:
+        - `base-url` is required; submitting an empty `base-url` in PUT/PATCH removes the entry.
+        - `headers` lets you attach custom HTTP headers per key. Empty keys/values are stripped automatically.
 
 ### Request Retry Count
 - GET `/request-retry` — Get integer
@@ -567,14 +574,14 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
       ```
     - Response:
       ```json
-      { "claude-api-key": [ { "api-key": "sk-a", "base-url": "", "proxy-url": "" } ] }
+      { "claude-api-key": [ { "api-key": "sk-a", "base-url": "https://example.com/api", "proxy-url": "socks5://proxy.example.com:1080", "headers": { "X-Workspace": "team-a" } } ] }
       ```
 - PUT `/claude-api-key` — Replace the list
     - Request:
       ```bash
       curl -X PUT -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '[{"api-key":"sk-a","proxy-url":"socks5://proxy.example.com:1080"},{"api-key":"sk-b","base-url":"https://c.example.com","proxy-url":""}]' \
+        -d '[{"api-key":"sk-a","proxy-url":"socks5://proxy.example.com:1080","headers":{"X-Workspace":"team-a"}},{"api-key":"sk-b","base-url":"https://c.example.com","proxy-url":"","headers":{"X-Env":"prod"}}]' \
         http://localhost:8317/v0/management/claude-api-key
       ```
     - Response:
@@ -586,14 +593,14 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-          -d '{"index":1,"value":{"api-key":"sk-b2","base-url":"https://c.example.com","proxy-url":""}}' \
+          -d '{"index":1,"value":{"api-key":"sk-b2","base-url":"https://c.example.com","proxy-url":"","headers":{"X-Env":"stage"}}}' \
           http://localhost:8317/v0/management/claude-api-key
         ```
     - Request (by match):
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-          -d '{"match":"sk-a","value":{"api-key":"sk-a","base-url":"","proxy-url":"socks5://proxy.example.com:1080"}}' \
+          -d '{"match":"sk-a","value":{"api-key":"sk-a","base-url":"","proxy-url":"socks5://proxy.example.com:1080","headers":{"X-Workspace":"team-a"}}}' \
           http://localhost:8317/v0/management/claude-api-key
         ```
     - Response:
@@ -613,6 +620,8 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
       ```json
       { "status": "ok" }
       ```
+    - Notes:
+        - `headers` is optional; empty/blank pairs are removed automatically. To drop a header, simply omit it in your update payload.
 
 ### OpenAI Compatibility Providers (object array)
 - GET `/openai-compatibility` — List all
@@ -622,14 +631,14 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
       ```
     - Response:
       ```json
-      { "openai-compatibility": [ { "name": "openrouter", "base-url": "https://openrouter.ai/api/v1", "api-key-entries": [ { "api-key": "sk", "proxy-url": "" } ], "models": [] } ] }
+      { "openai-compatibility": [ { "name": "openrouter", "base-url": "https://openrouter.ai/api/v1", "api-key-entries": [ { "api-key": "sk", "proxy-url": "" } ], "models": [], "headers": { "X-Provider": "openrouter" } } ] }
       ```
 - PUT `/openai-compatibility` — Replace the list
     - Request:
       ```bash
       curl -X PUT -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '[{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[{"name":"m","alias":"a"}]}]' \
+        -d '[{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[{"name":"m","alias":"a"}],"headers":{"X-Provider":"openrouter"}}]' \
         http://localhost:8317/v0/management/openai-compatibility
       ```
     - Response:
@@ -641,14 +650,14 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '{"name":"openrouter","value":{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[]}}' \
+        -d '{"name":"openrouter","value":{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[],"headers":{"X-Provider":"openrouter"}}}' \
         http://localhost:8317/v0/management/openai-compatibility
       ```
     - Request (by index):
       ```bash
       curl -X PATCH -H 'Content-Type: application/json' \
       -H 'Authorization: Bearer <MANAGEMENT_KEY>' \
-        -d '{"index":0,"value":{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[]}}' \
+        -d '{"index":0,"value":{"name":"openrouter","base-url":"https://openrouter.ai/api/v1","api-key-entries":[{"api-key":"sk","proxy-url":""}],"models":[],"headers":{"X-Provider":"openrouter"}}}' \
         http://localhost:8317/v0/management/openai-compatibility
       ```
     - Response:
@@ -658,6 +667,8 @@ These endpoints update the inline `config-api-key` provider inside the `auth.pro
 
     - Notes:
         - Legacy `api-keys` input remains accepted; keys are migrated into `api-key-entries` automatically so the legacy field will eventually remain empty in responses.
+        - `headers` lets you define provider-wide HTTP headers; blank keys/values are dropped.
+        - Providers without a `base-url` are removed. Sending a PATCH with `base-url` set to an empty string deletes that provider.
 - DELETE `/openai-compatibility` — Delete (`?name=` or `?index=`)
     - Request (by name):
       ```bash
@@ -681,18 +692,48 @@ Manage JSON token files under `auth-dir`: list, download, upload, delete.
       ```bash
       curl -H 'Authorization: Bearer <MANAGEMENT_KEY>' http://localhost:8317/v0/management/auth-files
       ```
-    - Response:
+    - Response (when the runtime auth manager is available):
       ```json
-      { "files": [ { "name": "acc1.json", "size": 1234, "modtime": "2025-08-30T12:34:56Z", "type": "google", "email": "user@example.com" } ] }
+      {
+        "files": [
+          {
+            "id": "claude-user@example.com",
+            "name": "claude-user@example.com.json",
+            "provider": "claude",
+            "label": "Claude Prod",
+            "status": "ready",
+            "status_message": "ok",
+            "disabled": false,
+            "unavailable": false,
+            "runtime_only": false,
+            "source": "file",
+            "path": "/abs/path/auths/claude-user@example.com.json",
+            "size": 2345,
+            "modtime": "2025-08-30T12:34:56Z",
+            "email": "user@example.com",
+            "account_type": "anthropic",
+            "account": "workspace-1",
+            "created_at": "2025-08-30T12:00:00Z",
+            "updated_at": "2025-08-31T01:23:45Z",
+            "last_refresh": "2025-08-31T01:23:45Z"
+          }
+        ]
+      }
       ```
     - Notes:
-        - `modtime` is returned in RFC3339 format; when metadata includes an email it is surfaced.
+        - Entries are sorted case-insensitively by `name`. `status`, `status_message`, `disabled`, and `unavailable` mirror the runtime auth manager so you can see whether a credential is healthy.
+        - `runtime_only: true` indicates the credential only exists in memory (for example Git/Postgres/ObjectStore backends); `source` switches to `memory`. When a `.json` file exists on disk, `source=file` and the response includes `path`/`size`/`modtime`.
+        - `email`, `account_type`, `account`, and `last_refresh` are pulled from the JSON metadata (keys such as `last_refresh`, `lastRefreshedAt`, `last_refreshed_at`, etc.).
+        - If the runtime auth manager is unavailable the handler falls back to scanning `auth-dir`, returning only `name`, `size`, `modtime`, `type`, and `email`.
+        - `runtime_only` entries cannot be downloaded or deleted via the file endpoints—they must be revoked from the upstream provider or a different API.
 
 - GET `/auth-files/download?name=<file.json>` — Download a single file
     - Request:
       ```bash
       curl -H 'Authorization: Bearer <MANAGEMENT_KEY>' -OJ 'http://localhost:8317/v0/management/auth-files/download?name=acc1.json'
       ```
+    - Notes:
+        - `name` must be a `.json` filename. Only `source=file` entries have a backing file to export; `runtime_only` credentials cannot be downloaded.
 
 - POST `/auth-files` — Upload
     - Request (multipart):
@@ -714,7 +755,7 @@ Manage JSON token files under `auth-dir`: list, download, upload, delete.
       ```
     - Notes:
         - The core auth manager must be active; otherwise the API returns `503` with `{ "error": "core auth manager unavailable" }`.
-        - Uploaded filenames must end with `.json`.
+        - Both multipart and raw JSON uploads must use filenames ending in `.json`; upon success the credential is registered with the runtime auth manager immediately.
 
 - DELETE `/auth-files?name=<file.json>` — Delete a single file
     - Request:
@@ -725,6 +766,8 @@ Manage JSON token files under `auth-dir`: list, download, upload, delete.
       ```json
       { "status": "ok" }
       ```
+    - Notes:
+        - Only on-disk `.json` files are removed; after a successful deletion the runtime manager is instructed to disable the corresponding credential. `runtime_only` entries are unaffected.
 
 - DELETE `/auth-files?all=true` — Delete all `.json` files under `auth-dir`
     - Request:
@@ -735,6 +778,8 @@ Manage JSON token files under `auth-dir`: list, download, upload, delete.
       ```json
       { "status": "ok", "deleted": 3 }
       ```
+    - Notes:
+        - Only files on disk are counted and removed; each successful deletion also triggers a disable call into the runtime auth manager. Purely in-memory entries stay untouched.
 
 ### Login/OAuth URLs
 
@@ -778,6 +823,9 @@ For Anthropic, Codex, Gemini CLI, and iFlow you can append `?is_webui=true` to r
       ```json
       { "status": "ok", "url": "https://...", "state": "gem-1716206400" }
       ```
+    - Notes:
+        - When `project_id` is omitted, the server queries Cloud Resource Manager for accessible projects, picks the first available one, and stores it in the token file (marked with `auto: true`).
+        - The flow checks and, if needed, enables `cloudaicompanion.googleapis.com` via the Service Usage API; failures surface through `/get-auth-status` as errors such as `project activation required: ...`.
 
 - GET `/qwen-auth-url` — Start Qwen login (device flow)
     - Request:
@@ -817,6 +865,9 @@ For Anthropic, Codex, Gemini CLI, and iFlow you can append `?is_webui=true` to r
       ```json
       { "status": "error", "error": "Authentication failed" }
       ```
+    - Notes:
+        - The `state` query parameter must match the value returned by the login endpoint. Once a flow reaches `status: "ok"` or `status: "error"`, the server deletes the state; subsequent polls receive `{ "status": "ok" }` to signal completion.
+        - `status: "wait"` indicates the flow is still waiting for a callback or token exchange—continue polling as needed.
 
 ## Error Responses
 
