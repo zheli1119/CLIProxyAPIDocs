@@ -2,7 +2,7 @@
 
 1.  克隆仓库并进入目录：
     ```bash
-    git clone https://github.com/luispater/CLIProxyAPI.git
+    git clone https://github.com/router-for-me/CLIProxyAPI.git
     cd CLIProxyAPI
     ```
 

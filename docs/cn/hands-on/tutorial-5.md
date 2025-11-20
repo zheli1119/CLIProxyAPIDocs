@@ -28,7 +28,7 @@ bash <(curl -fsSL [https://get.docker.com](https://get.docker.com))
 准备工作就绪后，请依次执行以下命令来克隆项目并初始化配置。
 
 ```bash
-git clone [https://github.com/luispater/CLIProxyAPI.git](https://github.com/luispater/CLIProxyAPI.git)
+git clone https://github.com/router-for-me/CLIProxyAPI.git
 cd CLIProxyAPI
 cp config.example.yaml config.yaml
 ```
