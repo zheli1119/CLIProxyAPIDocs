@@ -4,8 +4,11 @@
 
 config.toml:
 ```toml
-approval_policy = "never" # 无需确认是否执行操作，危险指令，初次接触codex删除该指令
-sandbox_mode = "danger-full-access" # 沙箱模式超高权限，危险指令，初次接触codex删除该指令
+# 无需确认是否执行操作，危险指令，初次接触codex不建议开启，移除#号即可开启
+# approval_policy = "never"
+
+# 沙箱模式超高权限，危险指令，初次接触codex不建议开启，移除#号即可开启
+# sandbox_mode = "danger-full-access"
 
 model_provider = "cliproxyapi"
 model = "gpt-5-codex" # 或者是gpt-5，你也可以使用任何我们支持的模型
